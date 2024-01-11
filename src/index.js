@@ -97,7 +97,7 @@ app.post("/v4", (req, res) => {
   axios
     .request(apiconfig)
     .then((response) => {
-      console.log(JSON.stringify(response.data));
+      //   console.log(JSON.stringify(response.data));
       res.send(response.data.trip.bounds[0].baggageAllowanceSpecifications[0]);
     })
     .catch((error) => {
