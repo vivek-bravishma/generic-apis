@@ -1,6 +1,11 @@
 import config from "./utils/config.js";
 global.CONFIG = config[process.env.NODE_ENV ?? "PRODUCTION"];
 
+import WebSocket from "ws";
+
+import mongoose from "mongoose";
+import Ticket from "./models/ticket.js";
+
 console.log("Generic api env==> ", {
   nodeEnv: process.env.NODE_ENV,
   nodePort: process.env.PORT,
@@ -10,6 +15,10 @@ console.log("Generic api config==> ", CONFIG);
 import express from "express";
 import cors from "cors";
 import axios from "axios";
+
+import helper from "./helpers/index.js";
+
+const { fetchAvayaToken, getAvayaMetricsQueue } = helper;
 
 const app = express();
 app.use(cors());
@@ -310,6 +319,145 @@ app.post("/v9", async (req, res) => {
   });
 });
 
+app.post("/journey-auth", async (req, res) => {
+  let { userId, sessionId } = req.body;
+  if (!userId.trim() || !sessionId.trim()) {
+    return res.status(400).send("userId or sessionId missing");
+  }
+
+  let authRes = await journeySocket(userId, sessionId);
+  console.log(authRes);
+
+  return res.send(authRes);
+});
+
+async function journeySocket(userId, sessionId) {
+  return new Promise((resolve, reject) => {
+    const url = `wss://app.journeyid.io/api/iframe/ws/users/${userId}/sessions/${sessionId}`;
+
+    let ws = new WebSocket(url);
+
+    ws.on("open", () => {
+      console.log("Connected to websocket");
+      ws.send(
+        "CONNECT eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJrYW1sZXNoamFpbiIsImlmciI6IjBlYjcyNDUzLTZmNmMtNDdhMC05YmRhLWYyOTFkN2E1MDNhOCIsImV4cCI6MTcwODY4NTAyNzgzOSwiaWF0IjoxNzA4Njg0OTQxfQ.28rpU-75lyTBO8ZpBP9HrlaWLZNMvc1qekZq92dNGFI"
+      );
+    });
+
+    ws.on("message", (data) => {
+      let messageData = JSON.parse(data);
+      console.log("Received message:", messageData.event);
+
+      if (
+        messageData.event === "session-authenticated" ||
+        messageData.event === "execution-completed"
+      ) {
+        ws.close();
+        resolve({ authentication: true });
+      }
+    });
+
+    ws.on("close", () => {
+      console.log("Connection closed");
+      // connect();
+    });
+
+    ws.on("error", (err) => {
+      reject(err);
+    });
+  });
+}
+
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
+});
+
+mongoose
+  .connect(
+    "mongodb+srv://vivek:xmM6t85qbIHWlgZx@vivek-custer.kk8uhws.mongodb.net/avaya?retryWrites=true&w=majority&appName=ViveK-Custer"
+  )
+  .then(
+    () => console.log("connected to db"),
+    (err) => console.log("Error connecting db", err)
+  );
+
+app.post("/tickets", async (req, res) => {
+  const { title, description, reporter } = req.body;
+  console.log(req.body);
+  if (!title.trim() || !description.trim() || !reporter.trim()) {
+    return res.status(400).send("title, description or reporter missing");
+  }
+  try {
+    const totalTickets = await Ticket.countDocuments({});
+    const caseId = `case-${totalTickets + 1}`;
+    console.log(totalTickets);
+    const ticket = new Ticket({
+      title,
+      description,
+      reporter,
+      caseId,
+    });
+    await ticket.save();
+    res.send(ticket);
+  } catch (error) {
+    console.log(error.message);
+    res.status(404).send(error);
+  }
+});
+
+app.get("/tickets", async (req, res) => {
+  try {
+    const tickets = await Ticket.find({});
+    res.send(tickets);
+  } catch (error) {
+    res.status(404).send(error);
+  }
+});
+
+app.get("/tickets/:id", async (req, res) => {
+  try {
+    const ticket = await Ticket.findOne({ caseId: req.params.id });
+    if (!ticket) {
+      return res.status(404).send("Ticket not found");
+    }
+    res.send(ticket);
+  } catch (error) {
+    res.status(404).send(error);
+  }
+});
+
+app.patch("/tickets/:id", async (req, res) => {
+  try {
+    const ticket = await Ticket.findOneAndUpdate(
+      { caseId: req.params.id },
+      req.body,
+      { new: false }
+    );
+    if (!ticket) {
+      return res.status(404).send("Ticket not found");
+    }
+    res.send(ticket);
+  } catch (error) {
+    res.status(404).send(error);
+  }
+});
+
+app.delete("/tickets/:id", async (req, res) => {
+  try {
+    await Ticket.findOneAndDelete({ caseId: req.params.id });
+    res.status(200).send("Ticket deleted");
+  } catch (error) {
+    res.status(404).send(error);
+  }
+});
+
+app.post("/metrics-data", async (req, res) => {
+  try {
+    let tokenData = await fetchAvayaToken();
+
+    let metricsData = await getAvayaMetricsQueue(tokenData.access_token);
+    res.send(metricsData);
+  } catch (error) {
+    res.status(404).send(error);
+  }
 });
