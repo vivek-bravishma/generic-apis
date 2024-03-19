@@ -3,11 +3,11 @@
 		"local": {
 			"baseUrl": "http://localhost:3011"
 		},
-		"staging": {
-			"baseUrl": "http://localhost:3011"
+		"server-local": {
+			"baseUrl": "http://localhost:5155"
 		},
 		"production": {
-			"baseUrl": "http://localhost:3011"
+			"baseUrl": "https://rahul.lab.bravishma.com"
 		}
 	}
 }
