@@ -581,4 +581,25 @@ app.post("/status", (req, res) => {
 	res.send("Status Api working");
 });
 
+app.post("/send-vonage-sms", async (req, res) => {
+	try {
+		const { from, text, to, api_key, api_secret } = req.body;
+
+		if (!to || !from || !text || !api_key || !api_secret) {
+			return res
+				.status(400)
+				.send("from, text, to, api_key and api_secret is required");
+		}
+
+		let vonagePayload = { from, text, to, api_key, api_secret };
+		let vonageUrl = "https://rest.nexmo.com/sms/json";
+
+		let vonageResponse = await axios.post(vonageUrl, vonagePayload);
+
+		res.send(vonageResponse.data);
+	} catch (error) {
+		res.status(400).send(error);
+	}
+});
+
 // ========================= XXX Vonage api XXX =========================
