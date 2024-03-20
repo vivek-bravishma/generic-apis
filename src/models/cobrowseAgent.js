@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 const cobrowseAgentSchema = new mongoose.Schema(
 	{
-		name: {
+		agentName: {
 			type: String,
 			required: true,
 		},

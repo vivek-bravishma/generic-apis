@@ -484,7 +484,7 @@ app.post("/cobrowse/accounts", async (req, res) => {
 	}
 	try {
 		const cobrowseAgent = new CobrowseAgent({
-			name: agentName,
+			agentName,
 			licenseKey,
 			token,
 			accountId,
@@ -492,7 +492,7 @@ app.post("/cobrowse/accounts", async (req, res) => {
 		await cobrowseAgent.save();
 		res.send(cobrowseAgent);
 	} catch (error) {
-		console.log(error.message);
+		console.log("Error creating new cobrowse agent=> ", error.message);
 		res.status(404).send(error);
 	}
 });
@@ -502,6 +502,7 @@ app.get("/cobrowse/accounts", async (req, res) => {
 		const cobrowseAgents = await CobrowseAgent.find({});
 		res.send(cobrowseAgents);
 	} catch (error) {
+		console.log("Error getting cobrowse agents=> ", error.message);
 		res.status(404).send(error);
 	}
 });
@@ -516,6 +517,10 @@ app.get("/cobrowse/accounts/:id", async (req, res) => {
 		}
 		res.send(cobrowseAgent);
 	} catch (error) {
+		console.log(
+			`Error getting cobrowse agent with id ${req.params.id}=> `,
+			error.message
+		);
 		res.status(404).send(error);
 	}
 });
@@ -526,7 +531,7 @@ app.patch("/cobrowse/accounts/:id", async (req, res) => {
 	try {
 		const { agentName, licenseKey, token, accountId } = req.body;
 		let payload = {
-			name: agentName?.trim(),
+			agentName: agentName?.trim(),
 			licenseKey: licenseKey?.trim(),
 			token: token?.trim(),
 			accountId: accountId?.trim(),
@@ -543,7 +548,10 @@ app.patch("/cobrowse/accounts/:id", async (req, res) => {
 		}
 		res.send(cobrowseAgent);
 	} catch (error) {
-		console.log("cobrowse agent update error===> ", error);
+		console.log(
+			`Error updating cobrowse agent with id ${req.params.id}`,
+			error.message
+		);
 		res.status(404).send(error);
 	}
 });
@@ -553,12 +561,14 @@ app.delete("/cobrowse/accounts/:id", async (req, res) => {
 		await CobrowseAgent.findOneAndDelete({ _id: req.params.id });
 		res.status(200).send("Cobrowse Agent deleted");
 	} catch (error) {
+		console.log(
+			`Error deleting cobrowse agent with id ${req.params.id}`,
+			error.message
+		);
 		res.status(404).send(error);
 	}
 });
 // ========================= XXX Cobarowse agent System XXX =========================
-
-
 
 // ============================  Vonage api  ============================
 

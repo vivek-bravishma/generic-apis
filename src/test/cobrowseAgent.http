@@ -6,7 +6,7 @@
 # @modifiedBy = {{$processEnv USERNAME}}
 # @baseUrl= https://rahul.lab.bravishma.com
 
-@_id= 65f98945d97f469c937635de
+@_id= 65fa8abf35fe0ba1df8445d6
 
 
 
@@ -40,7 +40,7 @@ PATCH {{baseUrl}}/cobrowse/accounts/{{_id}} HTTP/1.1
 Content-Type: application/json
 
 {
-    "agentName":"Nikhil Vishvas Ghorpade updating",
+    "agentName":"test agent name",
     "accountId":"test account id"
 }
 
