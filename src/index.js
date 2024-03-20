@@ -521,10 +521,21 @@ app.get("/cobrowse/accounts/:id", async (req, res) => {
 });
 
 app.patch("/cobrowse/accounts/:id", async (req, res) => {
+	console.log("update body==> ", req.body);
+
 	try {
+		const { agentName, licenseKey, token, accountId } = req.body;
+		let payload = {
+			name: agentName?.trim(),
+			licenseKey: licenseKey?.trim(),
+			token: token?.trim(),
+			accountId: accountId?.trim(),
+		};
+
+		console.log("update payload==> ", payload);
 		const cobrowseAgent = await CobrowseAgent.findOneAndUpdate(
 			{ _id: req.params.id },
-			req.body,
+			payload,
 			{ new: true }
 		);
 		if (!cobrowseAgent) {
@@ -532,6 +543,7 @@ app.patch("/cobrowse/accounts/:id", async (req, res) => {
 		}
 		res.send(cobrowseAgent);
 	} catch (error) {
+		console.log("cobrowse agent update error===> ", error);
 		res.status(404).send(error);
 	}
 });
@@ -545,3 +557,4 @@ app.delete("/cobrowse/accounts/:id", async (req, res) => {
 	}
 });
 // ========================= XXX Cobarowse agent System XXX =========================
+
