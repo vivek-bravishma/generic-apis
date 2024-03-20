@@ -558,3 +558,17 @@ app.delete("/cobrowse/accounts/:id", async (req, res) => {
 });
 // ========================= XXX Cobarowse agent System XXX =========================
 
+
+
+// ============================  Vonage api  ============================
+
+app.post("/inbound", (req, res) => {
+	console.log("Inbound : ", req.body);
+	res.send("Inbound Api working");
+});
+app.post("/status", (req, res) => {
+	console.log("Status : ", req.body);
+	res.send("Status Api working");
+});
+
+// ========================= XXX Vonage api XXX =========================
