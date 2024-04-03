@@ -3,6 +3,13 @@ global.CONFIG = config[process.env.NODE_ENV ?? "PRODUCTION"];
 
 import WebSocket from "ws";
 
+import {
+	AzureKeyCredential,
+	TextAnalyticsClient,
+} from "@azure/ai-text-analytics";
+
+import TextTranslationClient from "@azure-rest/ai-translation-text";
+
 import mongoose from "mongoose";
 import Ticket from "./models/ticket.js";
 import CobrowseAgent from "./models/cobrowseAgent.js";
@@ -603,3 +610,135 @@ app.post("/send-vonage-sms", async (req, res) => {
 });
 
 // ========================= XXX Vonage api XXX =========================
+
+// ============================  translation and sentiment apis  ============================
+
+const testSentiEndpoint =
+	"https://nlp-ai-chatbot-service.cognitiveservices.azure.com/";
+const testSentiKey = "1247acc61cb64ac68787c7994ab7b929";
+const textAnalyticsClient = new TextAnalyticsClient(
+	testSentiEndpoint,
+	new AzureKeyCredential(testSentiKey)
+);
+
+const transEndPnoit = "https://api.cognitive.microsofttranslator.com/";
+const transKey = "d8c2c98fae25486ba4c9617ae379de9a";
+const transReg = "eastus";
+const transClient = TextTranslationClient.default(transEndPnoit, {
+	key: transKey,
+	region: transReg,
+});
+
+app.post("/analyze-sentiment", async (req, res) => {
+	try {
+		let msg = req.body.message;
+		let msgSentiment = await getMessageSentiment(msg);
+		res.send(msgSentiment);
+	} catch (error) {
+		res.send(error);
+	}
+});
+
+app.post("/overall-sentiment", async (req, res) => {
+	try {
+		let msgs = req.body.messages;
+		let msgsSentiment = await getOverallSentiment(msgs);
+		res.send(msgsSentiment);
+	} catch (error) {
+		res.send(error);
+	}
+});
+
+app.get("/translate-message", async (req, res) => {
+	const { message, langs } = req.query;
+
+	try {
+		let transResponse = await translateMessage(message, langs);
+		res.send(transResponse);
+	} catch (error) {
+		res.send({ error: error.message });
+	}
+
+	// // message=这个怎么翻译&langs=en&langs=hi
+	// let fu = await translateMessage("这个怎么翻译", ["hi", "en"]);
+	// console.log("fu=> ", JSON.stringify(fu));
+});
+
+async function getMessageSentiment(message) {
+	try {
+		let sentiment = await textAnalyticsClient.analyzeSentiment([message]);
+		return sentiment;
+	} catch (error) {
+		throw new Error(error);
+	}
+}
+async function getOverallSentiment(messages) {
+	try {
+		let sentiments = await textAnalyticsClient.analyzeSentiment(messages);
+
+		let overAllSentimentScore = 0.0;
+		let msgCount = 0;
+
+		sentiments.forEach((sentiment) => {
+			let scores = sentiment.confidenceScores;
+			let messageSentimentScore = scores.positive - scores.negative;
+			overAllSentimentScore += messageSentimentScore;
+			msgCount++;
+		});
+
+		let averageSentimentScore = overAllSentimentScore / msgCount;
+		let threshold = 0.6;
+		let overAllSentiment;
+		if (averageSentimentScore > threshold) {
+			overAllSentiment = "positive";
+		} else if (averageSentimentScore < 0.2) {
+			overAllSentiment = "negative";
+		} else {
+			overAllSentiment = "neutral";
+		}
+
+		return {
+			sentiments,
+			overAllSentiment,
+			averageSentimentScore,
+		};
+	} catch (error) {
+		throw new Error(error);
+	}
+}
+async function translateMessage(message, langs = ["en"]) {
+	// console.log("translateMessage langs==>", langs);
+	try {
+		let resp = { originalMessage: message };
+		let inputText = [{ text: message }];
+		let transResp = (
+			await transClient.path("/translate").post({
+				body: inputText,
+				queryParameters: {
+					to: langs,
+					// to: ["en", "hi"],
+					// from: "hi",
+				},
+			})
+		).body;
+
+		if (transResp.error) {
+			throw new Error(transResp.error.message);
+		}
+
+		transResp.forEach((translations) => {
+			resp.detectedLanguage = translations.detectedLanguage.language;
+			resp.detectedLanguageScore = translations.detectedLanguage.score;
+			translations.translations.forEach((translation) => {
+				resp[`translatedMessage_${translation.to}`] = translation.text;
+			});
+		});
+
+		return resp;
+	} catch (error) {
+		throw new Error(error.message);
+	}
+}
+
+// ============================ XXX translation and sentiment apis XXX  ============================
+

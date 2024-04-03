@@ -1,0 +1,64 @@
+# @hostname = api.example.com
+# @port = 8080
+# @host = {{hostname}}:{{port}}
+# @contentType = application/json
+# @createdAt = {{$datetime iso8601}}
+# @modifiedBy = {{$processEnv USERNAME}}
+
+# translate a message
+
+@message=这个怎么翻译
+@langs=hi,en,fr,gu,he,mr,pa
+@invalidLangs=abcd
+
+
+# defaults to en as langs not provide
+GET {{baseUrl}}/translate-message
+?message={{message}}
+
+###
+
+# translates to all provided langs
+GET {{baseUrl}}/translate-message
+?message={{message}}
+&langs={{langs}}
+
+###
+# throws error as langs contains invalid langs
+GET {{baseUrl}}/translate-message
+?message={{message}}
+&langs={{invalidLangs}}
+
+
+###
+# analize sentiment of a message
+POST {{baseUrl}}/analyze-sentiment HTTP/1.1
+Content-Type: application/json
+
+{
+    "message":"thanks for your help"
+}
+
+###
+
+
+# analize overall sentiment of messages (positive)
+POST {{baseUrl}}/overall-sentiment HTTP/1.1
+Content-Type: application/json
+
+{
+    "messages":["thanks for your help","I am happy with your service"]
+}
+
+
+
+###
+
+
+# analize overall sentiment of messages (negative)
+POST {{baseUrl}}/overall-sentiment HTTP/1.1
+Content-Type: application/json
+
+{
+    "messages":["you are not able to help me","I am not happy with your service"]
+}
