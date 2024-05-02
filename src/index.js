@@ -13,6 +13,9 @@ import TextTranslationClient from "@azure-rest/ai-translation-text";
 import mongoose from "mongoose";
 import Ticket from "./models/ticket.js";
 import CobrowseAgent from "./models/cobrowseAgent.js";
+import CobrowseOrganization from "./models/cobrowse/organization.js";
+import CobrowseLicense from "./models/cobrowse/license.js";
+import CobrowseUser from "./models/cobrowse/user.js";
 
 console.log("Generic api env==> ", {
 	nodeEnv: process.env.NODE_ENV,
@@ -23,8 +26,10 @@ console.log("Generic api config==> ", CONFIG);
 import express from "express";
 import cors from "cors";
 import axios from "axios";
+import cookieParser from "cookie-parser";
 
 import helper from "./helpers/index.js";
+import cobroser from "./helpers/cobroser.js";
 
 const { fetchAvayaToken, getAvayaMetricsQueue } = helper;
 
@@ -32,6 +37,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 const port = CONFIG.PORT || 5155;
 
@@ -742,3 +748,400 @@ async function translateMessage(message, langs = ["en"]) {
 
 // ============================ XXX translation and sentiment apis XXX  ============================
 
+//	=============================     Cobrowse backend     =============================
+// Cobrowse Organization
+
+const cobrowseHelper = cobroser(CobrowseUser);
+
+function getcookie(req) {
+	let cookie = req.headers.cookie;
+	if (!cookie) {
+		return {};
+	}
+	let myCookies = {};
+	cookie.split("; ").map((c) => {
+		let [key, value] = c.split("=");
+		myCookies[key] = value;
+	});
+	return myCookies;
+}
+
+// auth middleware
+async function authMiddleware(req, res, next) {
+	try {
+		const { accessToken, refreshToken } = getcookie(req);
+		if (!accessToken) {
+			return res.send({ message: "Unauthorized" });
+		}
+		const { payload, expired } = cobrowseHelper.verifyJWT(
+			accessToken,
+			true
+		);
+		if (payload) {
+			req.user = payload;
+			return next();
+		}
+
+		console.log("========refreshToken=========> ", refreshToken);
+
+		const { payload: refresh } =
+			expired && refreshToken
+				? cobrowseHelper.verifyJWT(refreshToken, false)
+				: { payload: null };
+
+		console.log("=========refresh========> ", refresh);
+
+		if (!refresh) {
+			return next();
+		}
+		let { iat, exp, ...newPayload } = refresh;
+		const newAccessToken = cobrowseHelper.signJwt(newPayload, true);
+
+		res.cookie("accessToken", newAccessToken, {
+			httpOnly: true,
+			maxAge: 1000 * 60 * 1,
+		});
+
+		return next();
+	} catch (error) {
+		console.log("=========error.message========> ", error.message);
+	}
+}
+
+class serializeCobroUser {
+	constructor(user) {
+		this.username = user.name;
+		this.email = user.email;
+		this.contact = user.contact;
+		this.organizationId = user.organizationId;
+		this.userId = user._id;
+	}
+}
+class serializeCobroOrg {
+	constructor(org) {
+		this.organizationName = org.name;
+		this.email = org.email;
+		this.contact = org.contact;
+		this.address = org.address;
+	}
+}
+class serializeCobroLicense {
+	constructor(lic) {
+		this.licenseKey = lic.licenseKey;
+		this.token = lic.token;
+		this.userId = lic.userId;
+		this.organizationId = lic.orgnizationId;
+	}
+}
+
+app.post("/cobrowse/orgs", async (req, res) => {
+	const { name, email, contact, address } = req.body;
+	if (!name.trim() || !email.trim()) {
+		return res
+			.status(400)
+			.send({ error: "Organization name and email is required" });
+	}
+
+	try {
+		const org = new CobrowseOrganization({
+			name,
+			email,
+			contact,
+			address,
+		});
+		await org.save();
+		const user = await createCobrowseUser({
+			name,
+			email,
+			contact,
+			organizationId: org._id,
+		});
+
+		res.status(201).send(new serializeCobroUser(user));
+	} catch (error) {
+		console.log("Error creating cobro Org --> ", error);
+		if (error.code === 11000) {
+			return res.status(400).send({
+				error: "Organization already exists with same email",
+			});
+		}
+		res.status(400).send({ error: error.message });
+	}
+});
+
+app.get("/cobrowse/orgs", async (req, res) => {
+	try {
+		const orgs = await CobrowseOrganization.find({});
+		res.send(orgs);
+	} catch (error) {
+		res.status(400).send(error);
+	}
+});
+
+app.get("/cobrowse/orgs/:id", async (req, res) => {
+	try {
+		const org = await CobrowseOrganization.findOne({ _id: req.params.id });
+		if (!org) {
+			return res.status(404).send("Organization not found");
+		}
+		res.send(org);
+	} catch (error) {
+		res.status(400).send(error);
+	}
+});
+
+app.patch("/cobrowse/orgs/:id", async (req, res) => {
+	try {
+		console.log("wtf");
+		const { name, email, contact, address } = req.body;
+		const org = await CobrowseOrganization.findOneAndUpdate(
+			{ _id: req.params.id },
+			{ name, email, contact, address },
+			{ new: true }
+		);
+		if (!org) {
+			return res.status(404).send("Organization not found");
+		}
+		res.send(org);
+	} catch (error) {
+		console.log("Err updating cobrowse org=> ", error);
+		res.status(404).send(error.message);
+	}
+});
+
+app.delete("/cobrowse/orgs/:id", async (req, res) => {
+	try {
+		await CobrowseOrganization.findByIdAndUpdate(
+			{ _id: req.params.id },
+			{ isDeleted: true }
+		);
+		res.status(200).send("Organization deleted");
+	} catch (error) {
+		res.status(404).send(error);
+	}
+});
+
+// Cobrowse User
+
+// login
+app.post("/cobrowse/user/login", async (req, res) => {
+	const { email, password } = req.body;
+	if (!email || !password) {
+		return res.status(400).send({ error: "Email and password required" });
+	}
+
+	try {
+		let userData = await cobrowseHelper.login(email, password);
+
+		res.cookie("accessToken", userData.accessToken, {
+			httpOnly: true,
+			maxAge: 1000 * 60 * 1,
+		});
+		res.cookie("refreshToken", userData.refreshToken, {
+			httpOnly: true,
+			maxAge: 1000 * 60 * 5,
+		});
+
+		res.status(200).send(new serializeCobroUser(userData.user));
+	} catch (error) {
+		console.log("Error cobrowse user login  --> ", error);
+		res.status(400).send({ error: error.message });
+	}
+});
+
+app.get("/cobrowse/login/test", authMiddleware, async (req, res) => {
+	res.send(req.user);
+});
+
+// logout
+app.post("/cobrowse/user/logout", async (req, res) => {
+	try {
+		// await cobrowseHelper.logout()
+		res.clearCookie("accessToken");
+		res.clearCookie("refreshToken");
+	} catch (error) {
+		console.log("Error cobrowse user logout --> ", error);
+		res.status(400).send(error.message);
+	}
+});
+
+app.post("/cobrowse/users", async (req, res) => {
+	const { name, email, password, contact, organizationId } = req.body;
+	if (!name.trim() || !email.trim()) {
+		return res.status(400).send(" name and email is required");
+	}
+
+	try {
+		const user = await createCobrowseUser({
+			name,
+			email,
+			password,
+			contact,
+			organizationId,
+		});
+
+		res.send(user);
+	} catch (error) {
+		console.log("Error creating cobrowse user => ", error);
+		if (error.code === 11000) {
+			return res.status(400).send("User already exists with same email");
+		}
+		res.status(400).send(error);
+	}
+});
+
+app.get("/cobrowse/users", async (req, res) => {
+	try {
+		const users = await CobrowseUser.find({});
+		res.send(users);
+	} catch (error) {
+		res.status(400).send(error);
+	}
+});
+
+app.get("/cobrowse/users/:id", async (req, res) => {
+	try {
+		const user = await CobrowseUser.findOne({ _id: req.params.id });
+		if (!user) {
+			return res.status(404).send("User not found");
+		}
+		res.send(user);
+	} catch (error) {
+		res.status(400).send(error);
+	}
+});
+
+app.patch("/cobrowse/users/:id", async (req, res) => {
+	try {
+		const { name, email, contact, address } = req.body;
+		const org = await CobrowseUser.findOneAndUpdate(
+			{ _id: req.params.id },
+			{ name, email, contact, address },
+			{ new: true }
+		);
+		if (!org) {
+			return res.status(404).send("Organization not found");
+		}
+		res.send(org);
+	} catch (error) {
+		console.log("Err updating cobrowse org=> ", error);
+		res.status(404).send(error.message);
+	}
+});
+
+app.delete("/cobrowse/users/:id", async (req, res) => {
+	try {
+		await CobrowseUser.findByIdAndUpdate(
+			{ _id: req.params.id },
+			{ isDeleted: true }
+		);
+		res.status(200).send("User deleted");
+	} catch (error) {
+		res.status(404).send(error);
+	}
+});
+
+// Cobrowse License
+app.post("/cobrowse/licenses", async (req, res) => {
+	const { licenseKey, token, userId, organizationId } = req.body;
+	if (!licenseKey.trim() || !token.trim() || !organizationId.trim()) {
+		return res
+			.status(400)
+			.send("licenseKey, token and organizationId is required");
+	}
+
+	try {
+		const license = new CobrowseLicense({
+			licenseKey,
+			token,
+			userId,
+			organizationId,
+		});
+		await license.save();
+
+		res.send(license);
+	} catch (error) {
+		console.log("Error creating cobrowse license => ", error);
+		res.status(400).send(error);
+	}
+});
+
+app.get("/cobrowse/licenses", async (req, res) => {
+	try {
+		const licenses = await CobrowseLicense.find({});
+		res.send(licenses);
+	} catch (error) {
+		res.status(400).send(error);
+	}
+});
+
+app.get("/cobrowse/licenses/:id", async (req, res) => {
+	try {
+		const license = await CobrowseLicense.findOne({ _id: req.params.id });
+		if (!license) {
+			return res.status(404).send("License not found");
+		}
+		res.send(license);
+	} catch (error) {
+		res.status(400).send(error);
+	}
+});
+
+app.patch("/cobrowse/licenses/:id", async (req, res) => {
+	try {
+		const { licenseKey, token, userId, orgnizationId } = req.body;
+		const license = await CobrowseLicense.findOneAndUpdate(
+			{ _id: req.params.id },
+			{ licenseKey, token, userId, orgnizationId },
+			{ new: true }
+		);
+		if (!license) {
+			return res.status(404).send("license not found");
+		}
+		res.send(license);
+	} catch (error) {
+		console.log("Err updating cobrowse license => ", error);
+		res.status(404).send(error.message);
+	}
+});
+
+app.delete("/cobrowse/licenses/:id", async (req, res) => {
+	try {
+		await CobrowseLicense.findByIdAndUpdate(
+			{ _id: req.params.id },
+			{ isDeleted: true }
+		);
+		res.status(200).send("License deleted");
+	} catch (error) {
+		res.status(404).send(error);
+	}
+});
+
+// 	=========== functions ==========
+async function createCobrowseUser(userDetails) {
+	try {
+		const user = new CobrowseUser(userDetails);
+		await user.save();
+		return user;
+	} catch (error) {
+		throw new Error(error);
+	}
+}
+
+async function deleteAll(organizationId, model) {
+	try {
+		let usrs = await model.updateMany(
+			{ organizationId: organizationId },
+			{ isDeleted: true }
+		);
+		return usrs;
+	} catch (error) {
+		throw new Error(error);
+	}
+}
+
+//	============================= XXX Cobrowse backend XXX ==========================
+
+//	=========================  Avaya messaging connector backend  =========================
+
+//	=====================  XXX Avaya messaging connector backend XXX  =====================

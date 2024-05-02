@@ -1,0 +1,119 @@
+# @hostname = api.example.com
+# @port = 8080
+# @host = {{hostname}}:{{port}}
+# @contentType = application/json
+# @createdAt = {{$datetime iso8601}}
+# @modifiedBy = {{$processEnv USERNAME}}
+# @baseUrl= https://rahul.lab.bravishma.com
+
+@_id= 660a8d6b5e60da5500e406ce
+
+
+
+# // Cobrowse Organization
+# get all organizations
+GET {{baseUrl}}/cobrowse/orgs HTTP/1.1
+
+
+###
+
+# get organization by id
+GET {{baseUrl}}/cobrowse/orgs/{{_id}} HTTP/1.1
+
+###
+
+# create new organization
+POST {{baseUrl}}/cobrowse/orgs HTTP/1.1
+Content-Type: application/json
+
+{
+  "name": "vivek",
+  "email": "vivek23@gmail.com",
+  "contact": "don't contact",
+  "address": "some address"
+}
+
+###
+
+# update organization
+PATCH {{baseUrl}}/cobrowse/orgs/{{_id}} HTTP/1.1
+Content-Type: application/json
+
+{
+  "contact": "don't contact",
+  "address": "some address changed"
+}
+
+###
+
+# delete organization by id
+DELETE {{baseUrl}}/cobrowse/orgs/{{_id}} HTTP/1.1
+
+
+
+
+
+
+
+
+###
+#  Cobrowse Organizational User
+
+#  login 
+POST {{baseUrl}}/cobrowse/user/login HTTP/1.1
+Content-Type: application/json
+
+{
+  "email": "vivek22@gmail.com",
+  "password": "asdf"
+}
+
+
+###
+# login test
+GET {{baseUrl}}/cobrowse/login/test HTTP/1.1
+
+
+
+###
+
+# get all users of an organization
+
+GET {{baseUrl}}/cobrowse/users/ HTTP/1.1
+
+###
+
+# get user by id
+GET {{baseUrl}}/cobrowse/users/{{_id}} HTTP/1.1
+
+###
+
+# create new user in organization
+POST {{baseUrl}}/cobrowse/users HTTP/1.1
+Content-Type: application/json
+
+{
+  "name": "test user",
+  "email": "testuser@test.com",
+  "password": "test@bravishma",
+  "contact": "9876543210",
+  "organizationId": "{{_id}}"
+}
+
+###
+
+# update user in organization
+PATCH {{baseUrl}}/cobrowse/users/{{_id}} HTTP/1.1
+Content-Type: application/json
+
+{
+  "contact": "don't contact",
+  "address": "some address changed"
+}
+
+###
+
+# delete user by id from an organization
+DELETE {{baseUrl}}/cobrowse/users/{{_id}} HTTP/1.1
+
+
