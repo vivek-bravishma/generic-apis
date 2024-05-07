@@ -1159,6 +1159,17 @@ app.get("/voice-bot/customers", async (req, res) => {
 	}
 });
 
+app.get("/voice-bot/customer/:mobileNumber", async (req, res) => {
+	try {
+		const Mobile = req.params.mobileNumber;
+		const customers = await VoicebotCustomer.findOne({ Mobile: Mobile });
+		res.send(customers);
+	} catch (error) {
+		console.log("err in /voice-bot/customers get -> ", error);
+		res.status(400).send(error);
+	}
+});
+
 app.post("/voice-bot/customers", async (req, res) => {
 	try {
 		console.log("voice-bot/customers req body--> ", req.body);

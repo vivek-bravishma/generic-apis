@@ -1,5 +1,10 @@
 Get {{baseUrl}}/voice-bot/customers HTTP/1.1
 
+
+###
+
+Get {{baseUrl}}/voice-bot/customer/9876543210 HTTP/1.1
+
 ###
 POST  {{baseUrl}}/voice-bot/customers
 Content-Type: application/json
