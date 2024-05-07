@@ -16,6 +16,7 @@ import CobrowseAgent from "./models/cobrowseAgent.js";
 import CobrowseOrganization from "./models/cobrowse/organization.js";
 import CobrowseLicense from "./models/cobrowse/license.js";
 import CobrowseUser from "./models/cobrowse/user.js";
+import VoicebotCustomer from "./models/voicebot_customer.js";
 
 console.log("Generic api env==> ", {
 	nodeEnv: process.env.NODE_ENV,
@@ -1145,3 +1146,30 @@ async function deleteAll(organizationId, model) {
 //	=========================  Avaya messaging connector backend  =========================
 
 //	=====================  XXX Avaya messaging connector backend XXX  =====================
+
+//	=========================  Voice bot customer backend  =========================
+
+app.get("/voice-bot/customers", async (req, res) => {
+	try {
+		const customers = await VoiceBotCustomer.find({});
+		res.send(customers);
+	} catch (error) {
+		res.status(400).send(error);
+	}
+});
+
+app.post("/voice-bot/customers", async (req, res) => {
+	try {
+		const { name, mobile, isVipCustomer } = req.body;
+		const customer = new VoiceBotCustomer({
+			name,
+			mobile,
+			isVipCustomer,
+		});
+		await customer.save();
+		res.send(customer);
+	} catch (error) {
+		res.status(400).send(error);
+	}
+});
+//	=====================  XXX Voice bot customer backend XXX  =====================
