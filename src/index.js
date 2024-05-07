@@ -1151,20 +1151,22 @@ async function deleteAll(organizationId, model) {
 
 app.get("/voice-bot/customers", async (req, res) => {
 	try {
-		const customers = await VoiceBotCustomer.find({});
+		const customers = await VoicebotCustomer.find({});
 		res.send(customers);
 	} catch (error) {
+		console.log("err in /voice-bot/customers get -> ", error);
 		res.status(400).send(error);
 	}
 });
 
 app.post("/voice-bot/customers", async (req, res) => {
 	try {
-		const { name, mobile, isVipCustomer } = req.body;
-		const customer = new VoiceBotCustomer({
-			name,
-			mobile,
-			isVipCustomer,
+		console.log("voice-bot/customers req body--> ", req.body);
+		const { Name, Mobile, IsVipCustomer } = req.body;
+		const customer = new VoicebotCustomer({
+			Name,
+			Mobile,
+			IsVipCustomer,
 		});
 		await customer.save();
 		res.send(customer);

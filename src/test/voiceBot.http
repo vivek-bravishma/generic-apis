@@ -1,0 +1,12 @@
+Get {{baseUrl}}/voice-bot/customers HTTP/1.1
+
+###
+POST  {{baseUrl}}/voice-bot/customers
+Content-Type: application/json
+
+{
+  "Name": "test user",
+  "Mobile": "9876543210",
+  "IsVipCustomer": true
+}
+###

@@ -11,15 +11,15 @@ const voicebotCustomerSchema = new mongoose.Schema(
 			required: true,
 		},
 		IsVipCustomer: {
-			type: String,
-			required: true,
+			type: Boolean,
+			default: false,
 		},
 	},
 	{ timestamps: true }
 );
 
 const VoicebotCustomer = mongoose.model(
-	"Voicebot_Customer",
+	"VoicebotCustomer",
 	voicebotCustomerSchema
 );
 
